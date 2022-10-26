@@ -4,18 +4,20 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import ru.gaket.themoviedb.domain.review.repository.ReviewRepository
+import ru.gaket.themoviedb.domain.review.models.CreateReviewState
+import ru.gaket.themoviedb.domain.review.repository.CreateReviewScopedRepository
 import ru.gaket.themoviedb.presentation.review.ReviewFieldEvent
-import javax.inject.Inject
 
-@HiltViewModel
-class WhatLikeViewModel @Inject constructor(
-    private val reviewRepository: ReviewRepository,
+class WhatLikeViewModel @AssistedInject constructor(
+    @Assisted private val createReviewScopedRepository: CreateReviewScopedRepository,
 ) : ViewModel() {
 
     private val _events = MutableSharedFlow<ReviewFieldEvent>()
@@ -23,21 +25,25 @@ class WhatLikeViewModel @Inject constructor(
         get() = _events
             .asLiveData(viewModelScope.coroutineContext)
 
-    val initialValue: LiveData<String>
-        get() = reviewRepository.reviewState
-            .map { it.whatLiked }
-            .filterNotNull()
-            .asLiveData(viewModelScope.coroutineContext)
+    val initialValue: LiveData<String> = createReviewScopedRepository.observeState()
+        .filterIsInstance<CreateReviewState>()
+        .map { state -> state.form.whatLiked }
+        .filterNotNull()
+        .asLiveData(viewModelScope.coroutineContext)
 
     fun submitInfo(whatLike: String) {
         viewModelScope.launch {
-            val fieldEvent = if (whatLike.isBlank()) {
-                ReviewFieldEvent.EMPTY_FIELD
+            if (whatLike.isBlank()) {
+                _events.emit(ReviewFieldEvent.EMPTY_FIELD)
             } else {
-                reviewRepository.setWhatLike(whatLike)
-                ReviewFieldEvent.SUCCESS
+                createReviewScopedRepository.setWhatLike(whatLike)
             }
-            _events.emit(fieldEvent)
         }
+    }
+
+    @AssistedFactory
+    interface Factory {
+
+        fun create(createReviewScopedRepository: CreateReviewScopedRepository): WhatLikeViewModel
     }
 }

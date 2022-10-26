@@ -19,13 +19,12 @@ import ru.gaket.themoviedb.presentation.moviedetails.model.getCalendarYear
 import ru.gaket.themoviedb.presentation.moviedetails.viewmodel.MovieDetailsEvent
 import ru.gaket.themoviedb.presentation.moviedetails.viewmodel.MovieDetailsState
 import ru.gaket.themoviedb.presentation.moviedetails.viewmodel.MovieDetailsViewModel
+import ru.gaket.themoviedb.util.createAbstractViewModelFactory
 import ru.gaket.themoviedb.util.showSnackbar
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MovieDetailsFragment : Fragment(R.layout.fragment_movie_details) {
-
-    private val viewModel: MovieDetailsViewModel by viewModels()
 
     private val binding by viewBinding(FragmentMovieDetailsBinding::bind)
 
@@ -34,6 +33,18 @@ class MovieDetailsFragment : Fragment(R.layout.fragment_movie_details) {
 
     @Inject
     lateinit var webNavigator: WebNavigator
+
+    @Inject
+    lateinit var viewModelAssistedFactory: MovieDetailsViewModel.Factory
+
+    private val viewModel: MovieDetailsViewModel by viewModels {
+        createAbstractViewModelFactory {
+            viewModelAssistedFactory.create(
+                movieId = requireArguments().getLong(ARG_MOVIE_ID),
+                title = requireArguments().getString(ARG_MOVIE_TITLE).orEmpty()
+            )
+        }
+    }
 
     private val reviewsAdapter by lazy(LazyThreadSafetyMode.NONE) {
         ReviewsAdapter(onReviewClick = viewModel::onReviewClick)
@@ -123,8 +134,8 @@ class MovieDetailsFragment : Fragment(R.layout.fragment_movie_details) {
 
     companion object {
 
-        const val ARG_MOVIE_ID = "ARG_MOVIE_ID"
-        const val ARG_MOVIE_TITLE = "ARG_MOVIE_TITLE"
+        private const val ARG_MOVIE_ID = "ARG_MOVIE_ID"
+        private const val ARG_MOVIE_TITLE = "ARG_MOVIE_TITLE"
 
         fun newInstance(movieId: Long, title: String): MovieDetailsFragment = MovieDetailsFragment()
             .apply {

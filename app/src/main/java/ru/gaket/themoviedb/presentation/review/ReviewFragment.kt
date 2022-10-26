@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import androidx.activity.OnBackPressedCallback
+import androidx.annotation.IdRes
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -18,34 +19,43 @@ import ru.gaket.themoviedb.core.navigation.Navigator
 import ru.gaket.themoviedb.databinding.FragmentReviewBinding
 import ru.gaket.themoviedb.domain.movies.models.Movie
 import ru.gaket.themoviedb.domain.movies.models.MovieId
-import ru.gaket.themoviedb.domain.review.models.ReviewFormModel
-import ru.gaket.themoviedb.presentation.review.MovieWithReviewViewState.MovieWithReview
-import ru.gaket.themoviedb.presentation.review.MovieWithReviewViewState.NoMovie
-import ru.gaket.themoviedb.presentation.review.ReviewViewModel.ReviewState
-import ru.gaket.themoviedb.presentation.review.ReviewViewModel.ReviewState.END_STATE
-import ru.gaket.themoviedb.presentation.review.ReviewViewModel.ReviewState.RATING
-import ru.gaket.themoviedb.presentation.review.ReviewViewModel.ReviewState.WHAT_LIKED
-import ru.gaket.themoviedb.presentation.review.ReviewViewModel.ReviewState.WHAT_NOT_LIKED
+import ru.gaket.themoviedb.domain.review.models.CreateReviewForm
+import ru.gaket.themoviedb.domain.review.models.CreateReviewStep
+import ru.gaket.themoviedb.domain.review.repository.CreateReviewScopedRepository
 import ru.gaket.themoviedb.presentation.review.rating.RatingFragment
 import ru.gaket.themoviedb.presentation.review.whatliked.WhatLikeFragment
 import ru.gaket.themoviedb.presentation.review.whatnotliked.WhatNotLikeFragment
-import ru.gaket.themoviedb.util.toGone
+import ru.gaket.themoviedb.util.createAbstractViewModelFactory
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class ReviewFragment : Fragment(R.layout.fragment_review) {
 
+    private val binding: FragmentReviewBinding by viewBinding(FragmentReviewBinding::bind)
+
     @Inject
     lateinit var navigator: Navigator
 
-    private val binding: FragmentReviewBinding by viewBinding(FragmentReviewBinding::bind)
+    @Inject
+    lateinit var createReviewRepositoryAssistedFactory: CreateReviewScopedRepositoryImpl.Factory
 
-    private val viewModel: ReviewViewModel by viewModels()
+    @Inject
+    lateinit var reviewViewModelAssistedFactory: ReviewViewModel.Factory
+
+    private val createReviewScopedRepository: CreateReviewScopedRepository by viewModels<CreateReviewScopedRepositoryImpl> {
+        createAbstractViewModelFactory {
+            createReviewRepositoryAssistedFactory.create(movieId = requireArguments().getLong(ARG_MOVIE_ID))
+        }
+    }
+
+    private val viewModel: ReviewViewModel by viewModels<ReviewViewModel> {
+        createAbstractViewModelFactory {
+            reviewViewModelAssistedFactory.create(createReviewScopedRepository = createReviewScopedRepository)
+        }
+    }
 
     private val backPressedCallback: OnBackPressedCallback = object : OnBackPressedCallback(true) {
-        override fun handleOnBackPressed() {
-            viewModel.previousState()
-        }
+        override fun handleOnBackPressed() = viewModel.toPreviousStep()
     }
 
     override fun onAttach(context: Context) {
@@ -56,60 +66,71 @@ class ReviewFragment : Fragment(R.layout.fragment_review) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        viewModel.reviewState.observe(viewLifecycleOwner, ::handleReviewState)
-        viewModel.currentReview.observe(viewLifecycleOwner, ::handleMovieWithReviewState)
+        viewModel.state.observe(viewLifecycleOwner, ::handleState)
     }
 
-    private fun handleReviewState(state: ReviewState) {
-        val containerId = binding.containerReview.id
-
+    private fun handleState(state: ReviewViewModel.State) =
         when (state) {
-            WHAT_LIKED -> childFragmentManager.commit {
-                replace(containerId, WhatLikeFragment())
+            is ReviewViewModel.State.Data -> {
+                handleStep(state.createState.step)
+                binding.bind(state.movie, state.createState.form)
             }
-            WHAT_NOT_LIKED -> childFragmentManager.commit {
-                replace(containerId, WhatNotLikeFragment())
+            ReviewViewModel.State.NoMovie -> {
+                binding.cvReviewSummary.isVisible = false
             }
-            RATING -> childFragmentManager.commit {
-                replace(containerId, RatingFragment())
-            }
-            END_STATE -> navigator.backTo(MovieDetailsScreen.TAG)
         }
-    }
 
-    private fun handleMovieWithReviewState(state: MovieWithReviewViewState) {
-        when (state) {
-            is MovieWithReview -> binding.bind(state.movie, state.review)
-            NoMovie -> binding.cvReviewSummary.toGone()
+    private fun handleStep(step: CreateReviewStep) {
+        @IdRes val containerId = binding.containerReview.id
+
+        val currentFragmentClass: Class<Fragment>? = childFragmentManager.findFragmentById(containerId)?.javaClass
+        val newFragmentClass: Class<out Fragment>? = when (step) {
+            CreateReviewStep.WHAT_LIKED -> WhatLikeFragment::class.java
+            CreateReviewStep.WHAT_NOT_LIKED -> WhatNotLikeFragment::class.java
+            CreateReviewStep.RATING -> RatingFragment::class.java
+            CreateReviewStep.FINISH -> null
         }
-    }
 
-    private fun FragmentReviewBinding.bind(movie: Movie, review: ReviewFormModel) {
-        with(containerReviewSummary) {
-            Picasso.get()
-                .load(movie.thumbnail)
-                .placeholder(R.drawable.ph_movie_grey_200)
-                .error(R.drawable.ph_movie_grey_200)
-                .fit()
-                .centerCrop()
-                .into(ivMovieThumbnail)
-
-            tvRateMovieMessage.text = getString(R.string.review_rate_placeholder, movie.title)
-
-            tvWhatLike.isVisible = review.whatLiked != null
-            tvWhatNotLike.isVisible = review.whatDidNotLike != null
-
-            tvWhatLike.text = getString(R.string.review_liked_placeholder, review.whatLiked)
-            tvWhatNotLike.text = getString(R.string.review_not_liked_placeholder, review.whatDidNotLike)
+        when {
+            (newFragmentClass == null) -> {
+                navigator.backTo(MovieDetailsScreen.TAG)
+            }
+            (currentFragmentClass != newFragmentClass) -> {
+                childFragmentManager.commit {
+                    replace(containerId, newFragmentClass, null)
+                }
+            }
         }
     }
 
     companion object {
 
-        fun newInstance(movieId: MovieId): ReviewFragment {
-            return ReviewFragment().apply {
-                arguments = bundleOf(ReviewViewModel.ARG_MOVIE_ID to movieId)
+        private const val ARG_MOVIE_ID = "ARG_MOVIE_ID"
+
+        fun newInstance(movieId: MovieId): ReviewFragment =
+            ReviewFragment().apply {
+                arguments = bundleOf(ARG_MOVIE_ID to movieId)
             }
-        }
+    }
+}
+
+private fun FragmentReviewBinding.bind(movie: Movie, createReview: CreateReviewForm) {
+    with(containerReviewSummary) {
+        Picasso.get()
+            .load(movie.thumbnail)
+            .placeholder(R.drawable.ph_movie_grey_200)
+            .error(R.drawable.ph_movie_grey_200)
+            .fit()
+            .centerCrop()
+            .into(ivMovieThumbnail)
+
+        tvRateMovieMessage.text = tvRateMovieMessage.context.getString(R.string.review_rate_placeholder, movie.title)
+
+        tvWhatLike.isVisible = (createReview.whatLiked != null)
+        tvWhatNotLike.isVisible = (createReview.whatDidNotLike != null)
+
+        tvWhatLike.text = tvWhatLike.context.getString(R.string.review_liked_placeholder, createReview.whatLiked)
+        tvWhatNotLike.text =
+            tvWhatNotLike.context.getString(R.string.review_not_liked_placeholder, createReview.whatDidNotLike)
     }
 }

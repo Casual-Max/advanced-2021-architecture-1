@@ -8,11 +8,42 @@ import android.text.TextWatcher
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.isActive
+
+inline fun <reified T : Enum<T>> T.next(): T? {
+    val values = enumValues<T>()
+    return values.getOrNull(ordinal + 1)
+}
+
+inline fun <reified T : Enum<T>> T.previous(): T? {
+    val values = enumValues<T>()
+    return values.getOrNull(ordinal - 1)
+}
+
+inline fun <reified VM : ViewModel> createAbstractViewModelFactory(
+    crossinline creator: () -> VM,
+): ViewModelProvider.Factory =
+    object : ViewModelProvider.Factory {
+        override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+            require(modelClass == VM::class.java)
+            @Suppress("UNCHECKED_CAST")
+            return (creator() as T)
+        }
+    }
+
+suspend fun <T> FlowCollector<T>.emitIfActive(value: T) {
+    if (currentCoroutineContext().isActive) {
+        emit(value)
+    }
+}
 
 val Int.toDp: Int
     get() = (this / Resources.getSystem().displayMetrics.density).toInt()

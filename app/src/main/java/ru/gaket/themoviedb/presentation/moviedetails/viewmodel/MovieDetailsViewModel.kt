@@ -2,11 +2,12 @@ package ru.gaket.themoviedb.presentation.moviedetails.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -17,22 +18,17 @@ import ru.gaket.themoviedb.data.movies.MoviesRepository
 import ru.gaket.themoviedb.domain.auth.AuthInteractor
 import ru.gaket.themoviedb.domain.auth.isAuthorized
 import ru.gaket.themoviedb.domain.auth.observeIsAuthorized
+import ru.gaket.themoviedb.domain.movies.models.MovieId
 import ru.gaket.themoviedb.domain.movies.models.MovieWithReviews
 import ru.gaket.themoviedb.presentation.moviedetails.model.MovieDetailsReview
-import ru.gaket.themoviedb.presentation.moviedetails.view.MovieDetailsFragment.Companion.ARG_MOVIE_ID
-import ru.gaket.themoviedb.presentation.moviedetails.view.MovieDetailsFragment.Companion.ARG_MOVIE_TITLE
 import ru.gaket.themoviedb.util.Result
-import javax.inject.Inject
 
-@HiltViewModel
-class MovieDetailsViewModel @Inject constructor(
+class MovieDetailsViewModel @AssistedInject constructor(
     private val moviesRepository: MoviesRepository,
     private val authInteractor: AuthInteractor,
-    savedStateHandle: SavedStateHandle,
+    @Assisted val movieId: MovieId,
+    @Assisted private val title: String,
 ) : ViewModel() {
-
-    val movieId: Long = savedStateHandle.get<Long>(ARG_MOVIE_ID) ?: error("Movie id was not passed!")
-    private val title = savedStateHandle.get<String>(ARG_MOVIE_TITLE).orEmpty()
 
     private val _state = MutableLiveData<MovieDetailsState>(MovieDetailsState.Loading(title = title))
     val state: LiveData<MovieDetailsState> get() = _state
@@ -71,6 +67,12 @@ class MovieDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _events.emit(event)
         }
+    }
+
+    @AssistedFactory
+    interface Factory {
+
+        fun create(movieId: MovieId, title: String): MovieDetailsViewModel
     }
 }
 
