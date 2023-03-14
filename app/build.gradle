@@ -78,6 +78,8 @@ android {
         freeCompilerArgs += "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         freeCompilerArgs += "-Xopt-in=kotlin.contracts.ExperimentalContracts"
     }
+
+    namespace 'ru.gaket.themoviedb'
 }
 
 ext {
@@ -111,7 +113,7 @@ dependencies {
     kapt "androidx.room:room-compiler:$versions.room"
 
     implementation "com.jakewharton.timber:timber:5.0.1"
-    implementation "com.squareup.picasso:picasso:2.71828"
+    implementation "com.squareup.picasso:picasso:2.8"
     implementation "com.squareup.okhttp3:logging-interceptor:4.9.0"
     implementation "com.squareup.retrofit2:retrofit:$versions.retrofit"
     implementation "com.squareup.retrofit2:converter-gson:$versions.retrofit"

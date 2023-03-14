@@ -1,8 +1,8 @@
 buildscript {
     ext {
-        agp_version = '4.2.2'
-        hilt_version = '2.38.1'
-        kotlin_version = '1.5.30'
+        agp_version = '7.4.2'
+        hilt_version = '2.40.1'
+        kotlin_version = '1.6.21'
         google_services_version = '4.3.10'
     }
 
