@@ -16,7 +16,7 @@ interface MoviesDao {
         WHERE ${MovieEntity.MOVIE_ID}=:id
         LIMIT 1
         """)
-    suspend fun getById(id: MovieId): MovieEntity?
+    suspend fun getById(id: MovieId): MovieEntity
 
     @Transaction
     @Insert(onConflict = OnConflictStrategy.IGNORE)

@@ -10,4 +10,10 @@
     <color name="colorReviewLiked">#3FB832</color>
     <color name="colorReviewDisliked">#CF2D2D</color>
     <color name="colorReviewBackground">#F7F7F7</color>
+
+    <color name="colorAuthTitle">#3B67D7</color>
+
+    <color name="gradient_first">#BCD4F7</color>
+    <color name="gradient_second">#C3ECE3</color>
+    <color name="gradient_third">#97B7EB</color>
 </resources>
